@@ -1,5 +1,5 @@
 .openplay-empty{font-size:11px;color:#8f8994;padding:12px 2px;margin:0}
-.openplay-roster-row{display:grid;gap:6px;padding:9px 0;border-bottom:1px solid #2e2933}
+.roster-list>div.openplay-roster-row{display:block;padding:9px 0;border-bottom:1px solid #2e2933}
 .openplay-roster-row:last-child{border-bottom:0}
 .openplay-roster-row>div:first-child{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px}
 .roster-list>div{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid #2e2933}
