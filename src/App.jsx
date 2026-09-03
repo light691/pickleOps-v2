@@ -35,6 +35,7 @@ import { ReportsView } from './views/ReportsView.tsx';
 import { SettingsView } from './views/SettingsView.tsx';
 import { SideNav, Header } from './shell.tsx';
 import { fetchMe, logout as apiLogout } from './api.ts';
+import { applyTheme, readTheme, toggleTheme } from './theme.ts';
 import { LoginPage } from './views/LoginPage.tsx';
 
 function StatusPill({ children, kind = '' }) {
@@ -50,6 +51,15 @@ export function App() {
   const [openPlayOpen, setOpenPlayOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
   const [dataVersion, setDataVersion] = useState(0);
+  const [theme, setTheme] = useState(() => readTheme());
+
+  useEffect(() => {
+    applyTheme({ theme });
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((current) => toggleTheme({ theme: current }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -150,7 +160,7 @@ export function App() {
     <div className="app-shell">
       <SideNav active={active} setActive={setActive} staff={session.staff} onLogout={handleLogout} />
       <main className="workspace">
-        <Header onCreate={handleCreate} />
+        <Header onCreate={handleCreate} theme={theme} onToggleTheme={handleToggleTheme} />
         <div className="content">{content}</div>
       </main>
       <BookingDrawer

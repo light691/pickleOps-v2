@@ -10,15 +10,18 @@ import {
   House,
   MagnifyingGlass,
   MapPin,
+  Moon,
   Plus,
   SignOut,
   SlidersHorizontal,
+  Sun,
   TennisBall,
   UserPlus,
   UsersThree,
 } from "@phosphor-icons/react";
 
 import type { StaffMember } from "../shared/types.ts";
+import type { ThemeMode } from "./theme.ts";
 
 const nav: ReadonlyArray<readonly [string, typeof House]> = [
   ["Today", House],
@@ -94,13 +97,24 @@ export function SideNav({
   );
 }
 
-export function Header({ onCreate }: { onCreate: (type: string) => void }) {
+export function Header({
+  onCreate,
+  theme,
+  onToggleTheme,
+}: {
+  onCreate: (type: string) => void;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
+}) {
   const [createOpen, setCreateOpen] = useState(false);
 
   const chooseCreate = (type: string) => {
     setCreateOpen(false);
     onCreate(type);
   };
+
+  const light = theme === "light";
+  const toggleLabel = light ? "Switch to dark mode" : "Switch to light mode";
 
   return (
     <header className="topbar">
@@ -109,6 +123,16 @@ export function Header({ onCreate }: { onCreate: (type: string) => void }) {
         <input aria-label="Search bookings" placeholder="Search customer or booking..." />
       </label>
       <div className="top-actions">
+        <button
+          className="icon-button"
+          type="button"
+          aria-pressed={light}
+          aria-label={toggleLabel}
+          title={toggleLabel}
+          onClick={onToggleTheme}
+        >
+          {light ? <Moon size={18} /> : <Sun size={18} />}
+        </button>
         <button className="connection-icon" aria-label="Connection status: online" title="Online">
           <CloudCheck size={19} weight="duotone" />
         </button>
