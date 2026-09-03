@@ -315,6 +315,33 @@ export async function login({ name, pin }: { name: string; pin: string }): Promi
   return parseStaffPayload(payload);
 }
 
+export async function fetchMe(): Promise<StaffPayload> {
+  const res = await fetch("/api/auth/me", {
+    method: "GET",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+  });
+  let payload: unknown = null;
+  try {
+    payload = await res.json();
+  } catch {
+    payload = null;
+  }
+  if (!res.ok) {
+    const message = isRecord(payload) && typeof payload["error"] === "string" ? payload["error"] : "Sign in with your staff PIN first.";
+    throw new ApiError({ message, status: res.status });
+  }
+  return parseStaffPayload(payload);
+}
+
+export async function logout(): Promise<void> {
+  await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export async function fetchToday(): Promise<TodayResponse> {
   return parseToday(await request({ path: "/api/today", method: "GET" }));
 }

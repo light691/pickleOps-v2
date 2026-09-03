@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 import { useEffect, useState } from "react";
-import { ApiError, login } from "../api.ts";
 import type { ReportRange, ReportsResponse } from "../../server/routes/reportTypes.ts";
 import { fetchReports } from "./reportsApi.ts";
 import "./reports.css";
@@ -56,10 +55,6 @@ export function ReportsView() {
   const [report, setReport] = useState<ReportsResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(false);
-  const [staffName, setStaffName] = useState("");
-  const [pin, setPin] = useState("");
-  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,36 +64,17 @@ export function ReportsView() {
         if (cancelled) return;
         setReport(result);
         setError(null);
-        setNeedsLogin(false);
         setLoaded(true);
       })
       .catch((loadError) => {
         if (cancelled) return;
         setError(loadError instanceof Error ? loadError.message : "Could not load reports.");
-        setNeedsLogin(loadError instanceof ApiError && loadError.status === 401);
         setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, [range]);
-
-  async function signIn({ event }: { event: React.FormEvent }): Promise<void> {
-    event.preventDefault();
-    setSigningIn(true);
-    try {
-      await login({ name: staffName.trim(), pin });
-      setPin("");
-      const result = await fetchReports({ range });
-      setReport(result);
-      setError(null);
-      setNeedsLogin(false);
-    } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : "Sign in failed.");
-    } finally {
-      setSigningIn(false);
-    }
-  }
 
   return (
     <section className="page-panel reports-page">
@@ -120,33 +96,8 @@ export function ReportsView() {
           ))}
         </div>
       </div>
-      {needsLogin && (
-        <form className="login-inline" onSubmit={(event) => void signIn({ event })}>
-          <strong>Sign in to see venue reports</strong>
-          <span>Use your staff name and 4-digit PIN.</span>
-          <div>
-            <input
-              aria-label="Staff name"
-              placeholder="Staff name"
-              value={staffName}
-              onChange={(event) => setStaffName(event.target.value)}
-            />
-            <input
-              aria-label="Staff PIN"
-              placeholder="PIN"
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-            />
-            <button className="primary-button" type="submit" disabled={signingIn}>
-              {signingIn ? "Signing in…" : "Sign in"}
-            </button>
-          </div>
-        </form>
-      )}
       {!loaded && <p className="reports-status">{error ?? "Loading venue reports…"}</p>}
-      {loaded && error !== null && !needsLogin && <p className="reports-status">{error}</p>}
+      {loaded && error !== null && <p className="reports-status">{error}</p>}
       {report !== null && (
         <>
           <div className="report-metrics">

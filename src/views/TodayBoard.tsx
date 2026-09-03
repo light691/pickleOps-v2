@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, DotsThree } from "@phosphor-icons/react";
-import { ApiError, fetchToday, login } from "../api.ts";
+import { fetchToday } from "../api.ts";
 import type { TodayCourtCard } from "../../shared/types.ts";
 
 function StatusPill({ children, kind = "" }: { children: string; kind?: string }) {
@@ -111,36 +111,16 @@ export function TodayBoard({ onCourtAction }: { onCourtAction: (item: TodayCourt
   const [courts, setCourts] = useState<readonly TodayCourtCard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(false);
-  const [staffName, setStaffName] = useState("");
-  const [pin, setPin] = useState("");
-  const [signingIn, setSigningIn] = useState(false);
 
   async function load(): Promise<void> {
     try {
       const today = await fetchToday();
       setCourts(today.courts);
       setError(null);
-      setNeedsLogin(false);
       setLoaded(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load today.");
-      setNeedsLogin(loadError instanceof ApiError && loadError.status === 401);
       setLoaded(true);
-    }
-  }
-
-  async function signIn({ event }: { event: React.FormEvent }): Promise<void> {
-    event.preventDefault();
-    setSigningIn(true);
-    try {
-      await login({ name: staffName.trim(), pin });
-      setPin("");
-      await load();
-    } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : "Sign in failed.");
-    } finally {
-      setSigningIn(false);
     }
   }
 
@@ -190,31 +170,6 @@ export function TodayBoard({ onCourtAction }: { onCourtAction: (item: TodayCourt
           </div>
           <span>{error ?? (loaded ? "Updated just now" : "Loading live status…")}</span>
         </div>
-        {needsLogin && (
-          <form className="login-inline" onSubmit={(event) => void signIn({ event })}>
-            <strong>Sign in to see live courts</strong>
-            <span>Use your staff name and 4-digit PIN.</span>
-            <div>
-              <input
-                aria-label="Staff name"
-                placeholder="Staff name"
-                value={staffName}
-                onChange={(event) => setStaffName(event.target.value)}
-              />
-              <input
-                aria-label="Staff PIN"
-                placeholder="PIN"
-                type="password"
-                inputMode="numeric"
-                value={pin}
-                onChange={(event) => setPin(event.target.value)}
-              />
-              <button className="primary-button" type="submit" disabled={signingIn}>
-                {signingIn ? "Signing in…" : "Sign in"}
-              </button>
-            </div>
-          </form>
-        )}
         <div className="court-grid">
           {courts.map((item) => (
             <CourtCard item={item} onAction={onCourtAction} key={item.court} />

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
-import { setSignedCookie } from "hono/cookie";
+import { deleteCookie, setSignedCookie } from "hono/cookie";
 import { type StaffMember } from "../../shared/types.ts";
 import { getCookieSecret, parseStaffRow, verifyPin } from "../db.ts";
 import { requireStaff, venuesForStaff, type AuthedContext } from "../middleware.ts";
@@ -101,6 +101,11 @@ export function createAuthRoutes({ db }: { db: DatabaseSync }): Hono<AuthedConte
       maxAge: 12 * 60 * 60,
     });
     return c.json(staffPayload({ staff, venues: venuesForStaff({ db, staff }) }));
+  });
+
+  app.post("/api/auth/logout", (c) => {
+    deleteCookie(c, "staff_id", { path: "/" });
+    return c.json({ ok: true });
   });
 
   app.get("/api/auth/me", requireStaff({ db }), (c) => {

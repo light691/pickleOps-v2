@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Check, CurrencyCircleDollar } from "@phosphor-icons/react";
-import { ApiError, login } from "../api.ts";
 import {
   decidePayment,
   displayPaymentStatus,
@@ -54,10 +53,6 @@ export function PaymentsView() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(false);
-  const [staffName, setStaffName] = useState("");
-  const [pin, setPin] = useState("");
-  const [signingIn, setSigningIn] = useState(false);
   const [staffNote, setStaffNote] = useState("");
   const [acting, setActing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -82,11 +77,9 @@ export function PaymentsView() {
         return first === undefined ? null : first.id;
       });
       setError(null);
-      setNeedsLogin(false);
       setLoaded(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load payments.");
-      setNeedsLogin(loadError instanceof ApiError && loadError.status === 401);
       setLoaded(true);
     }
   }
@@ -94,20 +87,6 @@ export function PaymentsView() {
   useEffect(() => {
     void load({ queue: filter });
   }, [filter]);
-
-  async function signIn({ event }: { event: React.FormEvent }): Promise<void> {
-    event.preventDefault();
-    setSigningIn(true);
-    try {
-      await login({ name: staffName.trim(), pin });
-      setPin("");
-      await load({ queue: filter });
-    } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : "Sign in failed.");
-    } finally {
-      setSigningIn(false);
-    }
-  }
 
   async function decide({
     verdict,
@@ -197,19 +176,6 @@ export function PaymentsView() {
         </div>
       </div>
       {error !== null && <p className="payments-error">{error}</p>}
-      {needsLogin && (
-        <form className="login-inline" onSubmit={(event) => void signIn({ event })}>
-          <strong>Sign in to review payments</strong>
-          <span>Use your staff name and 4-digit PIN.</span>
-          <div>
-            <input aria-label="Staff name" placeholder="Staff name" value={staffName} onChange={(event) => setStaffName(event.target.value)} />
-            <input aria-label="Staff PIN" placeholder="PIN" type="password" inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} />
-            <button className="primary-button" type="submit" disabled={signingIn}>
-              {signingIn ? "Signing in…" : "Sign in"}
-            </button>
-          </div>
-        </form>
-      )}
       <div className="payments-layout">
         <div className="payment-list">
           {items.map((item) => (

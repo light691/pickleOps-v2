@@ -18,6 +18,8 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 
+import type { StaffMember } from "../shared/types.ts";
+
 const nav: ReadonlyArray<readonly [string, typeof House]> = [
   ["Today", House],
   ["Calendar", CalendarBlank],
@@ -27,7 +29,26 @@ const nav: ReadonlyArray<readonly [string, typeof House]> = [
   ["Settings", Gear],
 ];
 
-export function SideNav({ active, setActive }: { active: string; setActive: (view: string) => void }) {
+function initials({ name }: { name: string }): string {
+  return name
+    .split(" ")
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+export function SideNav({
+  active,
+  setActive,
+  staff,
+  onLogout,
+}: {
+  active: string;
+  setActive: (view: string) => void;
+  staff: StaffMember;
+  onLogout: () => void;
+}) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -59,21 +80,14 @@ export function SideNav({ active, setActive }: { active: string; setActive: (vie
       <div className="staff-list">
         <span>ON SHIFT</span>
         <div className="staff">
-          <div className="avatar coral">PG</div>
+          <div className={staff.role === "Manager" ? "avatar lilac" : "avatar coral"}>{initials({ name: staff.name })}</div>
           <div>
-            <strong>Paolo Garcia</strong>
-            <small>Attendant</small>
-          </div>
-        </div>
-        <div className="staff">
-          <div className="avatar lilac">MV</div>
-          <div>
-            <strong>Mia Villanueva</strong>
-            <small>Manager</small>
+            <strong>{staff.name}</strong>
+            <small>{staff.role}</small>
           </div>
         </div>
       </div>
-      <button className="logout">
+      <button className="logout" onClick={onLogout}>
         <SignOut size={17} /> Log out
       </button>
     </aside>
