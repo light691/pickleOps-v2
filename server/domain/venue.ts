@@ -167,6 +167,43 @@ function findOverlap({
   };
 }
 
+function tableExists({ db, table }: { db: DatabaseSync; table: string }): boolean {
+  const row = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+  return typeof row === "object" && row !== null && "n" in row && row.n === 1;
+}
+
+function findSessionClash({
+  db,
+  venueId,
+  input,
+}: {
+  db: DatabaseSync;
+  venueId: VenueId;
+  input: NewBookingInput;
+}): { sessionName: string; startMinute: MinutesFromMidnight; endMinute: MinutesFromMidnight } | null {
+  if (!tableExists({ db, table: "openplay_sessions" })) return null;
+  const end = bookingEndMinute({ start: input.startMinute, durationMinutes: input.durationMinutes });
+  const rows = db
+    .prepare(
+      `SELECT name, start_minute, end_minute FROM openplay_sessions
+       WHERE venue_id = ? AND date = ?
+         AND instr(',' || replace(replace(replace(court_ids, '[', ''), ']', ''), ' ', '') || ',', ',' || ? || ',') > 0
+         AND start_minute < ? AND end_minute > ? ORDER BY start_minute ASC LIMIT 1`,
+    )
+    .all(venueId, input.date, String(input.courtId as number), end, input.startMinute) as readonly unknown[];
+  const first = rows[0];
+  if (first === undefined) return null;
+  if (typeof first !== "object" || first === null) throw new TypeError("Expected open play session row");
+  const record = first as Record<string, unknown>;
+  const name = record["name"];
+  const startValue = record["start_minute"];
+  const endValue = record["end_minute"];
+  if (typeof name !== "string" || typeof startValue !== "number" || typeof endValue !== "number") {
+    throw new TypeError("Expected open play session columns");
+  }
+  return { sessionName: name, startMinute: minuteOfDay(startValue), endMinute: minuteOfDay(endValue) };
+}
+
 function toClash({ overlap }: { overlap: OverlapRow }): ClashInfo {
   return {
     court: overlap.courtName,
@@ -233,6 +270,12 @@ export function createBooking({
     const overlap = findOverlap({ db, venueId, input });
     if (overlap !== null) {
       throw new ConflictError({ message: toClash({ overlap }).summary, clash: toClash({ overlap }) });
+    }
+    const sessionClash = findSessionClash({ db, venueId, input });
+    if (sessionClash !== null) {
+      throw new ConflictError({
+        message: `${court.name} is reserved for ${sessionClash.sessionName} from ${formatClock({ minute: sessionClash.startMinute })} to ${formatClock({ minute: sessionClash.endMinute })}.`,
+      });
     }
     const id = nextBookingId({ db, date: input.date });
     const total = computeFee({ hourlyRate: court.hourlyRate, durationMinutes: input.durationMinutes, overtimeMinutes: 0 });
@@ -308,6 +351,30 @@ export function startBooking({
   return parseSessionRow(row);
 }
 
+function overtimeRules({ db, venueId }: { db: DatabaseSync; venueId: VenueId }): { grace: number; minimum: number } {
+  const names = new Set<string>();
+  const columns = db.prepare("PRAGMA table_info(venue_settings)").all() as readonly unknown[];
+  for (const column of columns) {
+    if (typeof column === "object" && column !== null && "name" in column && typeof column.name === "string") {
+      names.add(column.name);
+    }
+  }
+  if (!names.has("overtime_grace_minutes") || !names.has("overtime_minimum_minutes")) {
+    return { grace: 10, minimum: 0 };
+  }
+  const row = db
+    .prepare("SELECT overtime_grace_minutes AS grace, overtime_minimum_minutes AS minimum FROM venue_settings WHERE venue_id = ?")
+    .get(venueId);
+  if (typeof row !== "object" || row === null) return { grace: 10, minimum: 0 };
+  const record = row as Record<string, unknown>;
+  const grace = record["grace"];
+  const minimum = record["minimum"];
+  return {
+    grace: typeof grace === "number" ? grace : 10,
+    minimum: typeof minimum === "number" ? minimum : 0,
+  };
+}
+
 export function endBooking({
   db,
   venueId,
@@ -333,7 +400,9 @@ export function endBooking({
     throw new ConflictError({ message: `Booking ${id} is ${booking.status} and cannot end.` });
   }
   const court = loadCourt({ db, venueId, courtId: booking.courtId });
-  const overtime = Math.max(0, (nowMinute as number) - (session.scheduledEndMinute as number));
+  const rawOvertime = Math.max(0, (nowMinute as number) - (session.scheduledEndMinute as number));
+  const rules = overtimeRules({ db, venueId });
+  const overtime = rawOvertime <= rules.grace ? 0 : Math.max(rules.minimum, rawOvertime);
   const total = computeFee({
     hourlyRate: court.hourlyRate,
     durationMinutes: booking.durationMinutes,

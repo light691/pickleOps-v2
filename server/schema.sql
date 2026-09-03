@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS staff (
   name TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL,
   pin_salt TEXT NOT NULL,
-  pin_hash TEXT NOT NULL
+  pin_hash TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS staff_venues (

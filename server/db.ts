@@ -38,6 +38,9 @@ export function openDb(): DatabaseSync {
   const db = new DatabaseSync("pickleops.db");
   dropLegacySingleTenantTables(db);
   db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
+  ensureStaffActiveColumn({ db });
+  db.exec(readFileSync(new URL("./paymentsSchema.sql", import.meta.url), "utf8"));
+  db.exec(readFileSync(new URL("./openplaySchema.sql", import.meta.url), "utf8"));
   seed(db);
   database = db;
   return db;
@@ -136,6 +139,29 @@ function seed(db: DatabaseSync): void {
       randomBytes(32).toString("hex"),
     );
   }
+}
+
+function staffColumnNames({ db }: { db: DatabaseSync }): ReadonlySet<string> {
+  const rows = db.prepare("PRAGMA table_info(staff)").all() as readonly unknown[];
+  const names = new Set<string>();
+  for (const row of rows) {
+    if (typeof row === "object" && row !== null && "name" in row && typeof row.name === "string") {
+      names.add(row.name);
+    }
+  }
+  return names;
+}
+
+function ensureStaffActiveColumn({ db }: { db: DatabaseSync }): void {
+  if (staffColumnNames({ db }).has("active")) return;
+  db.exec("ALTER TABLE staff ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
+}
+
+export function staffActive({ db, staffId }: { db: DatabaseSync; staffId: number }): boolean {
+  if (!staffColumnNames({ db }).has("active")) return true;
+  const row = db.prepare("SELECT active FROM staff WHERE id = ?").get(staffId);
+  if (typeof row !== "object" || row === null || !("active" in row)) return true;
+  return row.active !== 0;
 }
 
 export function getCookieSecret(db: DatabaseSync): string {

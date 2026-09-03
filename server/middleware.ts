@@ -9,7 +9,7 @@ import {
   type StaffMember,
   type VenueId,
 } from "../shared/types.ts";
-import { getCookieSecret, parseStaffRow, parseVenueRow, readCount } from "./db.ts";
+import { getCookieSecret, parseStaffRow, parseVenueRow, readCount, staffActive } from "./db.ts";
 
 export interface AppVariables {
   staff: StaffMember;
@@ -37,6 +37,9 @@ export function requireStaff({ db }: GuardDeps) {
       return c.json({ error: "Sign in with your staff PIN first." }, 401);
     }
     const staff = parseStaffRow(row);
+    if (staffActive({ db, staffId: staff.id }) === false) {
+      return c.json({ error: "This staff account is deactivated." }, 401);
+    }
     c.set("staff", staff);
     c.set("staffId", staff.id);
     await next();

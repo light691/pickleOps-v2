@@ -7,6 +7,13 @@ import { openDb } from "./db.ts";
 import type { AuthedContext } from "./middleware.ts";
 import { createAuthRoutes } from "./routes/auth.ts";
 import { createBookingRoutes } from "./routes/bookings.ts";
+import { createCalendarRoutes } from "./routes/calendar.ts";
+import { createCourtRoutes } from "./routes/courts.ts";
+import { createOpenPlayRoutes } from "./routes/openplay.ts";
+import { createPaymentRoutes } from "./routes/payments.ts";
+import { createReportRoutes } from "./routes/reports.ts";
+import { createSettingsRoutes } from "./routes/settings.ts";
+import { createStaffRoutes } from "./routes/staff.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env["PORT"] ?? 5173);
@@ -16,6 +23,13 @@ const db = openDb();
 const app = new Hono<AuthedContext>();
 app.route("/", createAuthRoutes({ db }));
 app.route("/", createBookingRoutes({ db }));
+app.route("/", createCalendarRoutes({ db }));
+app.route("/", createCourtRoutes({ db }));
+app.route("/", createOpenPlayRoutes({ db }));
+app.route("/", createPaymentRoutes({ db }));
+app.route("/", createReportRoutes({ db }));
+app.route("/", createSettingsRoutes({ db }));
+app.route("/", createStaffRoutes({ db }));
 app.notFound((c) => c.json({ error: "Not found." }, 404));
 app.onError((error, c) => {
   console.error(error);
