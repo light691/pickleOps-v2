@@ -79,7 +79,7 @@ export function App() {
 
   const content =
     active === 'Today' ? (
-      <TodayBoard onCourtAction={handleCourtAction} />
+      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} />
     ) : active === 'Calendar' ? (
       <CalendarView key={`calendar-${dataVersion}`} onNewBooking={() => openBooking(null)} />
     ) : active === 'Open Play' ? (
@@ -91,7 +91,7 @@ export function App() {
     ) : active === 'Settings' ? (
       <SettingsView />
     ) : (
-      <TodayBoard onCourtAction={handleCourtAction} />
+      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} />
     );
 
   return (
