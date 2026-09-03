@@ -22,9 +22,11 @@ Preconditions:
 - Instance healthy at `http://localhost:5174`.
 - A booking exists on the target day.
 - `doctor.mjs` reports the expected URL and git revision.
+- The Calendar view has no sign-in form of its own. Every drive signs in on the Today view first within the same invocation, then navigates to Calendar.
 
+- **Sign in.** Fill staff credentials on Today. Run `--do "goto|?view=Today" --do "fill|Staff name|Mia Villanueva" --do "fill|Staff PIN|1234" --do "click|button|Sign in"`.
 - **Open the grid.** Go to the view. Run `--do "goto|?view=Calendar"`. Columns render per court with blocks.
-- **Select a block.** Choose a booking block. Run `--do "click|button|<customer> on <court> at <range>"` using the exact aria label from a prior `aria` snapshot. A `Selected booking` panel appears.
+- **Select a block.** Choose a booking block. Run `--do "click|button|<customer> on <court> at <range>"` using the exact aria label from a prior `aria` snapshot. A `Selected booking` panel appears. Note: `expect` matches visible text only, so presence of an aria-labeled block is asserted by clicking it or by snapshotting and reading the file, never by `expect`.
 - **Reschedule.** Change the start time and save. The block moves. An overlapping time shows a `role=alert` banner and the block stays put.
 - **Transfer.** Change the court and save. The block renders under the new court column.
 - **Cancel.** Choose cancel in the detail panel. The block disappears and the slot accepts a new booking.

@@ -23,7 +23,9 @@ Preconditions:
 - Instance healthy at `http://localhost:5174`.
 - A session with capacity 2 exists, or create one through the form.
 - `doctor.mjs` reports the expected URL and git revision.
+- The Open Play view has no sign-in form of its own. Every drive signs in on the Today view first within the same invocation, then navigates to Open Play.
 
+- **Sign in.** Fill staff credentials on Today. Run `--do "goto|?view=Today" --do "fill|Staff name|Mia Villanueva" --do "fill|Staff PIN|1234" --do "click|button|Sign in"`.
 - **Open the list.** Go to the view. Run `--do "goto|?view=Open Play"`. Sessions render with capacity counts and status pills.
 - **Fill to full.** Register two players through the roster walk-in form. Status flips to `Full`.
 - **Waitlist.** Register a third player. They land waitlisted with position 1.

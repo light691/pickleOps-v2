@@ -27,7 +27,7 @@ Preconditions:
 - **Review.** Choose a row. Run `--do "click|button|<payer>"` using the exact name from a prior `aria` snapshot. The receipt detail shows expected versus submitted, reference, and payer.
 - **Verify.** Choose verify with a note as Mia Villanueva. The row leaves the review queue and the history names the verifier.
 - **Reject path.** Submit a second payment and reject it with a note asking for a clearer receipt. History records the rejection.
-- **Role gate.** Sign in as Paolo Garcia and attempt a verdict. The UI refuses and the API answers 403.
+- **Role gate.** Sign in as Paolo Garcia and attempt a verdict. The server answers 403 and the UI shows a generic error. The buttons do not check roles client-side, so an enabled button with a refused request is the correct observable behavior, not a bug.
 - **Proof.** Run `--do "shot|payments.png" --do "aria|payments.aria.txt"`. The artifacts show the decided rows and their history.
 
 ## Gotchas
