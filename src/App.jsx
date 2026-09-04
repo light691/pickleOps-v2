@@ -129,7 +129,7 @@ export function App() {
 
   const content =
     active === 'Today' ? (
-      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} />
+      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} staffName={session?.staff?.name ?? ''} />
     ) : active === 'Calendar' ? (
       <CalendarView key={`calendar-${dataVersion}`} onNewBooking={() => openBooking(null)} />
     ) : active === 'Open Play' ? (
@@ -141,7 +141,7 @@ export function App() {
     ) : active === 'Settings' ? (
       <SettingsView />
     ) : (
-      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} />
+      <TodayBoard key={`today-${dataVersion}`} onCourtAction={handleCourtAction} staffName={session?.staff?.name ?? ''} />
     );
 
   if (sessionStatus === 'unknown') {

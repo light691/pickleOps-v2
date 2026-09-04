@@ -18,24 +18,24 @@ function collectSteps({ args }) {
   return steps;
 }
 
-async function runStep({ page, base, out, step }) {
+async function runStep({ page, base, out, step, timeout }) {
   const parts = step.split("|");
   const op = parts[0];
   if (op === "goto") {
     const url = new URL(parts[1], base.endsWith("/") ? base : `${base}/`).toString();
-    await page.goto(url);
+    await page.goto(url, { timeout });
     return `opened ${url}`;
   }
   if (op === "fill") {
-    await page.getByLabel(parts[1]).and(page.locator("input, textarea")).first().fill(parts[2] ?? "");
+    await page.getByLabel(parts[1]).and(page.locator("input, textarea")).first().fill(parts[2] ?? "", { timeout });
     return `filled ${parts[1]}`;
   }
   if (op === "select") {
-    await page.getByLabel(parts[1]).and(page.locator("select")).first().selectOption({ label: parts[2] });
+    await page.getByLabel(parts[1]).and(page.locator("select")).first().selectOption({ label: parts[2] }, { timeout });
     return `selected ${parts[2]} in ${parts[1]}`;
   }
   if (op === "click") {
-    await page.getByRole(parts[1], { name: parts[2] }).first().click();
+    await page.getByRole(parts[1], { name: parts[2] }).first().click({ timeout });
     return `clicked ${parts[1]} ${parts[2]}`;
   }
   if (op === "shot") {
@@ -47,8 +47,15 @@ async function runStep({ page, base, out, step }) {
     writeFileSync(`${out}/${parts[1]}`, snapshot);
     return `saved ${parts[1]}`;
   }
+  if (op === "theme") {
+    await page.evaluate((next) => {
+      window.localStorage.setItem("pickleops.theme", next);
+    }, parts[1]);
+    await page.reload();
+    return `theme ${parts[1]}`;
+  }
   if (op === "expect") {
-    await page.getByText(parts[1]).first().waitFor({ state: "visible", timeout: 10000 });
+    await page.getByText(parts[1]).first().waitFor({ state: "visible", timeout });
     return `saw ${parts[1]}`;
   }
   if (op === "wait") {
@@ -61,6 +68,8 @@ async function runStep({ page, base, out, step }) {
 const args = process.argv.slice(2);
 const base = argValue({ args, flag: "--base" });
 const out = argValue({ args, flag: "--out" });
+const timeoutIndex = args.indexOf("--timeout");
+const stepTimeout = timeoutIndex >= 0 ? Number(args[timeoutIndex + 1]) : 8000;
 const steps = collectSteps({ args });
 if (steps.length === 0) throw new Error("Pass at least one --do step.");
 mkdirSync(out, { recursive: true });
@@ -77,7 +86,7 @@ try {
   await page.goto(base.replace(/\/$/, "") + "/");
   for (const [index, step] of steps.entries()) {
     try {
-      const note = await runStep({ page, base, out, step });
+      const note = await runStep({ page, base, out, step, timeout: stepTimeout });
       console.log(`step ${index + 1}: ${note}`);
     } catch (error) {
       const shot = `${out}/failure-step-${index + 1}.png`;

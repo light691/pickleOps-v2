@@ -15,7 +15,13 @@ function eventKind({ status }: { status: TodayCourtCard["status"] }): string {
   return "";
 }
 
-function OperationsOverview({ courts }: { courts: readonly TodayCourtCard[] }) {
+function greetingForHour({ hour }: { hour: number }): string {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function OperationsOverview({ courts, staffName }: { courts: readonly TodayCourtCard[]; staffName: string }) {
   const available = courts.filter((court) => court.status === "Available").length;
   const inPlay = courts.filter((court) => court.status === "In play").length;
   const attention = courts.filter((court) => court.status === "Overtime" || court.status === "Arriving soon").length;
@@ -26,7 +32,7 @@ function OperationsOverview({ courts }: { courts: readonly TodayCourtCard[] }) {
       <div className="events-panel">
         <div className="section-heading">
           <div>
-            <h1>Good afternoon, Paolo</h1>
+            <h1>{greetingForHour({ hour: new Date().getHours() })}, {staffName.split(" ")[0]}</h1>
             <p>What needs your attention in the next 90 minutes.</p>
           </div>
           <button className="period">
@@ -107,7 +113,7 @@ function CourtCard({ item, onAction }: { item: TodayCourtCard; onAction: (item: 
   );
 }
 
-export function TodayBoard({ onCourtAction }: { onCourtAction: (item: TodayCourtCard) => void }) {
+export function TodayBoard({ onCourtAction, staffName }: { onCourtAction: (item: TodayCourtCard) => void; staffName: string }) {
   const [courts, setCourts] = useState<readonly TodayCourtCard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +147,7 @@ export function TodayBoard({ onCourtAction }: { onCourtAction: (item: TodayCourt
 
   return (
     <>
-      <OperationsOverview courts={courts} />
+      <OperationsOverview courts={courts} staffName={staffName} />
       <section className="openplay-strip">
         <div>
           <h2>Open Play</h2>

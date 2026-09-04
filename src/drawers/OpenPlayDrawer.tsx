@@ -145,7 +145,6 @@ export function OpenPlayDrawer({
           ? await createOpenPlaySession({ input })
           : await updateOpenPlaySession({ id: session.id as number, input });
       setSavedName(saved.name);
-      onSaved();
     } catch (error) {
       setFormError(error instanceof ApiError ? error.message : "Could not save the session. Try again.");
     } finally {
@@ -172,7 +171,7 @@ export function OpenPlayDrawer({
             </span>
             <h2>{editing ? "Session updated" : "Open Play created"}</h2>
             <p>{editing ? `${savedName} has been updated.` : "The session is ready to accept player registrations."}</p>
-            <button className="primary-button" onClick={onClose}>
+            <button className="primary-button" onClick={onSaved}>
               Back to Open Play
             </button>
           </div>

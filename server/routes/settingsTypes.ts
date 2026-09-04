@@ -28,6 +28,13 @@ export type BookingIntervalMinutes = (typeof BOOKING_INTERVALS)[number];
 
 export const STAFF_CHANGE_ACTIONS = ["invited", "role-changed", "deactivated", "reactivated"] as const;
 
+export const DEFAULT_PAYMENT_METHODS: readonly SettingsPaymentMethod[] = [
+  { name: "GCash", detail: "", enabled: true },
+  { name: "Maya", detail: "", enabled: true },
+  { name: "Bank transfer", detail: "", enabled: true },
+  { name: "Cash", detail: "", enabled: true },
+];
+
 export type StaffChangeAction = (typeof STAFF_CHANGE_ACTIONS)[number];
 
 export interface SettingsPaymentMethod {
@@ -593,7 +600,7 @@ export function toSettingsPayload({
   const row = toSettingsRow({ value: settingsRow });
   const status = row.default_payment_status;
   if (!isPaymentStatus(status)) throw new TypeError(`Unknown payment status in database: ${status}`);
-  const methods = row.payment_methods === null ? [] : parsePaymentMethods({ value: JSON.parse(row.payment_methods) });
+  const methods = row.payment_methods === null ? DEFAULT_PAYMENT_METHODS : parsePaymentMethods({ value: JSON.parse(row.payment_methods) });
   if (methods === null) throw new TypeError("Stored payment methods are corrupt");
   return {
     venueId: venue.id,
