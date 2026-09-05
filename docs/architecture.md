@@ -47,7 +47,7 @@ One Node process. `npm run dev` mounts Vite middleware for hot reload. Productio
 
 TypeScript runs strict. External data enters as `unknown` and parses into domain types at route boundaries. No `as` casts without validation. New union variants must extend the exhaustive switches or the build fails.
 
-Money is integer centavos and times are minutes from midnight, Manila day. Fractional pesos are unrepresentable. Court status is never stored. The server derives Available, Arriving soon, In play, Open play soon, and Overtime from sessions. Booking ids keep the RP-240904-031 form, generated server-side. Marking a registration paid creates a PaymentSubmission in Review, so manual verification stays the single money gate. Today polls every 15 seconds. No SSE for MVP.
+Money is integer centavos and times are minutes from midnight, Manila day. Fractional pesos are unrepresentable. Court status is never stored. The server derives Available, Arriving soon, In play, Open play soon, Open play (active shared session), and Overtime from sessions. Booking ids keep the RP-240904-031 form, generated server-side. Marking a registration paid creates a PaymentSubmission in Review, so manual verification stays the single money gate. Today polls every 15 seconds. No SSE for MVP.
 
 Auth is PIN login at `POST /api/auth/login` setting a signed cookie. Middleware resolves staff and checks the PERMISSIONS map. Every mutation records its actor. Attendants cannot verify payments or edit rates.
 

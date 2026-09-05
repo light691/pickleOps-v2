@@ -1,187 +1,101 @@
-import { useEffect, useState } from "react";
-import { Clock, DotsThree } from "@phosphor-icons/react";
+import { useEffect, useId, useState } from "react";
+import { ArrowUpRight, Clock, Info, TennisBall, UsersThree } from "@phosphor-icons/react";
 import { fetchToday } from "../api.ts";
+import { listOpenPlaySessions } from "./openplayApi.ts";
 import type { TodayCourtCard } from "../../shared/types.ts";
+import type { OpenPlaySession } from "../../server/routes/openplayTypes.ts";
+import "./today.css";
 
-function StatusPill({ children, kind = "" }: { children: string; kind?: string }) {
-  return <span className={`pill ${kind}`}>{children}</span>;
+const statuses = ["Available", "In play", "Arriving soon", "Open play soon", "Overtime"] as const;
+const accents = ["available", "playing", "arriving", "openplay", "overtime"];
+function matchesStatus(item: TodayCourtCard, status: string) {
+  return status === "Open play soon" ? item.accent === "openplay" : item.status === status;
 }
-
-function eventKind({ status }: { status: TodayCourtCard["status"] }): string {
-  if (status === "Overtime") return "danger";
-  if (status === "Arriving soon") return "gold";
-  if (status === "In play") return "lavender";
-  if (status === "Open play soon") return "pink";
-  return "";
+function courtAction(item: TodayCourtCard) {
+  return item.status === "Available" ? item.action : item.accent === "openplay" ? "Manage Open Play" : "View in Calendar";
 }
-
-function greetingForHour({ hour }: { hour: number }): string {
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+function manilaNow() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  return { date: now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }), minute: Number(parts.find(p => p.type === "hour")?.value) * 60 + Number(parts.find(p => p.type === "minute")?.value) };
 }
-
-function OperationsOverview({ courts, staffName }: { courts: readonly TodayCourtCard[]; staffName: string }) {
-  const available = courts.filter((court) => court.status === "Available").length;
-  const inPlay = courts.filter((court) => court.status === "In play").length;
-  const attention = courts.filter((court) => court.status === "Overtime" || court.status === "Arriving soon").length;
-  const events = courts.filter((court) => court.status !== "Available");
-
-  return (
-    <section className="operations-overview">
-      <div className="events-panel">
-        <div className="section-heading">
-          <div>
-            <h1>{greetingForHour({ hour: new Date().getHours() })}, {staffName.split(" ")[0]}</h1>
-            <p>What needs your attention in the next 90 minutes.</p>
-          </div>
-          <button className="period">
-            Now & next
-          </button>
-        </div>
-        <div className="event-list">
-          {events.length === 0 && (
-            <div className="event-row">
-              <span className="event-marker"></span>
-              <time>Now</time>
-              <span className="event-court">All courts</span>
-              <div>
-                <strong>Every court is available</strong>
-                <small>No upcoming arrivals in the next 30 minutes</small>
-              </div>
-            </div>
-          )}
-          {events.map((event) => (
-            <div className="event-row" key={event.court}>
-              <span className={`event-marker ${eventKind({ status: event.status })}`}></span>
-              <time>{event.status === "Overtime" ? "Now" : event.next}</time>
-              <span className="event-court">{event.court}</span>
-              <div>
-                <strong>{event.customer ?? event.headline ?? event.status}</strong>
-                <small>{event.meta}</small>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="ops-metrics">
-        <div className="ops-metric">
-          <span>Available now</span>
-          <strong>
-            {available} <small>courts</small>
-          </strong>
-        </div>
-        <div className="ops-metric">
-          <span>In play</span>
-          <strong>
-            {inPlay} <small>courts</small>
-          </strong>
-        </div>
-        <div className="ops-metric attention">
-          <span>Needs attention</span>
-          <strong>
-            {attention} <small>items</small>
-          </strong>
-        </div>
-      </div>
-    </section>
-  );
+function formatMinute(minute: number) {
+  return `${Math.floor(minute / 60) % 12 || 12}:${String(minute % 60).padStart(2, "0")} ${minute >= 720 ? "PM" : "AM"}`;
 }
-
 function CourtCard({ item, onAction }: { item: TodayCourtCard; onAction: (item: TodayCourtCard) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const revealed = !dismissed && (expanded || hovered);
+  const id = useId();
+  const timing = item.status === "Available" ? item.headline : item.status === "Arriving soon" || item.accent === "openplay" ? item.meta.split(" · ")[0] : item.next;
   return (
-    <article className={`court-tile ${item.accent}`}>
-      <div className="court-tile-head">
-        <div>
-          <span className="court-label">{item.court}</span>
-          <StatusPill kind={item.kind}>{item.status}</StatusPill>
-        </div>
-        <button aria-label={`More options for ${item.court}`}>
-          <DotsThree size={19} weight="bold" />
-        </button>
+    <article className={`live-court ${item.accent} ${revealed ? "is-expanded" : ""}`}
+      onPointerEnter={event => { if (event.pointerType === "mouse") { setHovered(true); setDismissed(false); } }}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={event => { if (event.target.matches(":focus-visible")) { setExpanded(true); setDismissed(false); } }}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false); }}
+      onKeyDown={event => { if (event.key === "Escape") { setExpanded(false); setDismissed(true); } }}>
+      <div className="live-court-head">
+        <span className="live-court-name"><TennisBall size={19} weight="duotone" />{item.court}</span>
+        <button className="court-info" aria-label={`Details for ${item.court}`} aria-expanded={revealed} aria-controls={id} onClick={() => { setExpanded(!expanded); setDismissed(expanded); }}><Info size={18} /></button>
       </div>
-      <h3>{item.headline ?? item.customer ?? item.status}</h3>
-      <p>{item.meta}</p>
-      <div className="court-next">
-        <Clock size={15} />
-        <span>{item.next}</span>
+      <div className="live-court-status"><i />{item.status}</div>
+      <p className="live-court-customer">{item.customer ?? "Ready for your next game"}</p>
+      <div className="live-court-footer"><span><Clock size={14} />{timing}</span><button title={courtAction(item)} aria-label={`${courtAction(item)} — ${item.court}`} onClick={() => onAction(item)}><ArrowUpRight size={18} /></button></div>
+      <div className="court-reveal" id={id} hidden={!revealed}>
+        <span className="court-reveal-label">SESSION DETAILS</span>
+        <strong>{item.customer ?? item.headline ?? item.status}</strong>
+        <p>{item.meta}</p><p>{item.next}</p>
+        <button onClick={() => onAction(item)}>{courtAction(item)}<ArrowUpRight size={15} /></button>
       </div>
-      <button className="court-action" onClick={() => onAction(item)}>
-        {item.action}
-      </button>
     </article>
   );
 }
-
 export function TodayBoard({ onCourtAction, staffName }: { onCourtAction: (item: TodayCourtCard) => void; staffName: string }) {
   const [courts, setCourts] = useState<readonly TodayCourtCard[]>([]);
+  const [sessions, setSessions] = useState<readonly OpenPlaySession[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function load(): Promise<void> {
-    try {
-      const today = await fetchToday();
-      setCourts(today.courts);
-      setError(null);
-      setLoaded(true);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load today.");
-      setLoaded(true);
-    }
-  }
-
+  const [sessionError, setSessionError] = useState(false);
+  const [filter, setFilter] = useState<string>("All courts");
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    async function load() {
+      const now = manilaNow();
+      const [today, openPlay] = await Promise.allSettled([fetchToday(), listOpenPlaySessions({ date: now.date })]);
       if (cancelled) return;
-      await load();
-    })();
-    const timer = window.setInterval(() => {
-      if (!cancelled) void load();
-    }, 15000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+      if (today.status === "fulfilled") { setCourts(today.value.courts); setError(null); }
+      else setError(today.reason instanceof Error ? today.reason.message : "Could not refresh courts.");
+      if (openPlay.status === "fulfilled") { setSessions(openPlay.value); setSessionError(false); }
+      else setSessionError(true);
+      setLoaded(true);
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
-
+  const now = manilaNow();
+  const hour = Math.floor(now.minute / 60);
+  const relevantSessions = sessions.filter(s => s.date === now.date && s.endMinute > now.minute).sort((a,b) => a.startMinute - b.startMinute);
+  const visible = courts.filter(c => filter === "All courts" || matchesStatus(c, filter));
+  const attention = courts.filter(c => c.urgent || c.status === "Arriving soon").sort((a,b) => Number(b.urgent)-Number(a.urgent));
   return (
-    <>
-      <OperationsOverview courts={courts} staffName={staffName} />
-      <section className="openplay-strip">
-        <div>
-          <h2>Open Play</h2>
-          <p>Shared sessions, capacity, waitlist, and payment status for the day.</p>
-        </div>
-        <div className="openplay-strip-meta">
-          <div>
-            <span>Next session</span>
-            <strong>2:00 PM</strong>
-          </div>
-          <div>
-            <span>Registration</span>
-            <strong>9 / 12</strong>
-          </div>
-          <div>
-            <span>Needs payment</span>
-            <strong>1 player</strong>
-          </div>
-        </div>
+    <div className="today-page">
+      <header className="today-welcome"><div><span className="today-eyebrow">VENUE OVERVIEW</span><h1>Good {hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}, {staffName.split(" ")[0]}.</h1><p>A little less to manage. More room to play.</p></div><div className="today-date"><span>{new Date().toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long" })}</span><strong>{new Date().toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" })}</strong></div></header>
+      <section className="today-summary" aria-label="Current court counts">{statuses.map((status, index) => <div className={accents[index]} key={status}><span><i />{status === "Open play soon" ? "Open Play" : status}</span><strong>{loaded && !error ? courts.filter(c => matchesStatus(c, status)).length : "—"}</strong></div>)}</section>
+      <section className="live-courts-section">
+        <div className="today-section-head"><div><h2>On the courts <span>{courts.length}</span></h2><p>The whole venue, at a glance.</p></div><span className={`today-live ${error ? "has-error" : ""}`}><i />{error ? "Refresh interrupted" : loaded ? "Live · refreshes every 15s" : "Connecting…"}</span></div>
+        <div className="court-filters" aria-label="Filter courts">{["All courts", ...statuses].map(status => <button key={status} aria-pressed={filter === status} className={filter === status ? "active" : ""} onClick={() => setFilter(status)}>{status === "Open play soon" ? "Open Play" : status}</button>)}</div>
+        {error && <p className="today-error" role="alert">{error}{courts.length > 0 ? " Showing the last received court statuses." : " Retrying automatically."}</p>}
+        <div className="live-court-grid">{visible.map(item => <CourtCard key={item.courtId} item={item} onAction={onCourtAction} />)}</div>
+        {!loaded && <div className="today-empty">Loading your courts…</div>}
+        {loaded && !error && visible.length === 0 && <div className="today-empty">{courts.length === 0 ? "No courts configured yet. Add your courts in Settings." : "No courts with this status right now."}</div>}
+        <div className="court-grid-note"><Info size={13} />Hover a court for details, or tap its info icon.</div>
       </section>
-      <section className="courts-section">
-        <div className="courts-heading">
-          <div>
-            <h2>Courts right now</h2>
-            <p>Live status for all six courts</p>
-          </div>
-          <span>{error ?? (loaded ? "Updated just now" : "Loading live status…")}</span>
-        </div>
-        <div className="court-grid">
-          {courts.map((item) => (
-            <CourtCard item={item} onAction={onCourtAction} key={item.court} />
-          ))}
-        </div>
-      </section>
-    </>
+      {loaded && !error && <section className="today-attention"><div className="today-section-head"><h2>Keep an eye on <span>{attention.length}</span></h2><span>Arrivals & attention</span></div>{attention.length === 0 ? <div className="today-clear"><span className="clear-dot" /><div><strong>You're all caught up</strong><p>No arrivals or court alerts need your attention right now.</p></div></div> : attention.map(item => <button className={`attention-row ${item.accent}`} key={item.courtId} onClick={() => onCourtAction(item)}><span className="attention-court"><i />{item.court}</span><span><strong>{item.customer ?? item.status}</strong><small>{item.status} · {item.meta}</small></span><span>{item.next}</span><ArrowUpRight size={16} /></button>)}</section>}
+      {relevantSessions.length > 0 && <section className="today-openplay"><div className="today-openplay-title"><UsersThree size={23} /><div><h2>Open Play today</h2><p>{relevantSessions.length} active or upcoming {relevantSessions.length === 1 ? "session" : "sessions"}</p></div></div><div><span>{relevantSessions[0]!.startMinute <= now.minute ? "Started at" : "Next start"}</span><strong>{formatMinute(relevantSessions[0]!.startMinute)}</strong></div><div><span>Registered</span><strong>{relevantSessions.reduce((n,s) => n+s.rosterCount,0)} / {relevantSessions.reduce((n,s) => n+s.capacity,0)}</strong></div><div><span>Waitlisted</span><strong>{relevantSessions.reduce((n,s) => n+s.waitlistCount,0)}</strong></div></section>}
+      {sessionError && <p className="today-error" role="status">Open Play could not refresh. Retrying automatically.</p>}
+    </div>
   );
 }

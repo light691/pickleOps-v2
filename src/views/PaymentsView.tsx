@@ -161,7 +161,7 @@ export function PaymentsView() {
   const pending = items.filter((row) => row.status === "In review").length;
 
   return (
-    <section className="page-panel">
+    <section className="page-panel payments-page">
       <div className="page-title">
         <div>
           <h1>Payment verification</h1>
@@ -177,7 +177,7 @@ export function PaymentsView() {
       </div>
       {error !== null && <p className="payments-error">{error}</p>}
       <div className="payments-layout">
-        <div className="payment-list">
+        <div className="payment-list" role="region" aria-label="Payment submissions" tabIndex={0}>
           {items.map((item) => (
             <button className={item.id === selectedId ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}>
               <div className="avatar coral">{initials({ name: item.payerName })}</div>
@@ -196,6 +196,7 @@ export function PaymentsView() {
           {selected === null && <p className="payments-empty">Pick a submission to review its receipt.</p>}
           {selected !== null && (
             <>
+              <div className="payment-detail-scroll" role="region" aria-label="Payment details" tabIndex={0}>
               <div className="receipt">
                 <CurrencyCircleDollar size={36} />
                 <strong>{selected.method ?? "Unrecorded method"} payment receipt</strong>
@@ -229,7 +230,7 @@ export function PaymentsView() {
                     <div>
                       <strong>{entry.stage}</strong>
                       <small>
-                        {[entry.by, entry.at].filter((part) => part !== null).join(" · ")}
+                        {[entry.by, entry.at ? new Date(entry.at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null].filter((part) => part !== null).join(" · ")}
                       </small>
                       {entry.note !== null && <small>{entry.note}</small>}
                     </div>
@@ -245,6 +246,7 @@ export function PaymentsView() {
                   disabled={selected.status !== "In review" || acting}
                 />
               </label>
+              </div>
               <div className="payment-actions">
                 <button
                   className="secondary-button"

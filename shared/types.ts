@@ -79,13 +79,14 @@ export function assertNever({ value }: { value: never }): never {
   throw new Error(`Unhandled union variant: ${String(value)}`);
 }
 
-export type CourtStatus = "Available" | "Arriving soon" | "In play" | "Open play soon" | "Overtime";
+export type CourtStatus = "Available" | "Arriving soon" | "In play" | "Open play soon" | "Open play" | "Overtime";
 
 export const COURT_STATUSES = [
   "Available",
   "Arriving soon",
   "In play",
   "Open play soon",
+  "Open play",
   "Overtime",
 ] as const satisfies readonly CourtStatus[];
 
@@ -164,6 +165,7 @@ export function statusPresentation({ status }: { status: CourtStatus }): StatusP
       return { kind: "gold", accent: "arriving", action: "Check in" };
     case "In play":
       return { kind: "lavender", accent: "playing", action: "Extend" };
+    case "Open play":
     case "Open play soon":
       return { kind: "pink", accent: "openplay", action: "Manage open play" };
     case "Overtime":

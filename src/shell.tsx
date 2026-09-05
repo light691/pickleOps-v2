@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Bell,
   CalendarBlank,
   CaretDown,
   ChartBar,
@@ -8,12 +7,10 @@ import {
   CloudCheck,
   Gear,
   House,
-  MagnifyingGlass,
   MapPin,
   Moon,
   Plus,
   SignOut,
-  SlidersHorizontal,
   Sun,
   TennisBall,
   UserPlus,
@@ -65,6 +62,9 @@ export function SideNav({
           <button
             key={label}
             className={active === label ? "nav-item active" : "nav-item"}
+            aria-current={active === label ? "page" : undefined}
+            aria-label={label}
+            title={label}
             onClick={() => setActive(label)}
           >
             <Icon size={17} />
@@ -74,11 +74,10 @@ export function SideNav({
       </nav>
       <div className="sidebar-section">
         <span>VENUE</span>
-        <button className="venue-button">
+        <div className="venue-button">
           <MapPin size={17} />
           <span>Quezon City</span>
-          <CaretDown size={13} />
-        </button>
+        </div>
       </div>
       <div className="staff-list">
         <span>ON SHIFT</span>
@@ -98,10 +97,12 @@ export function SideNav({
 }
 
 export function Header({
+  active,
   onCreate,
   theme,
   onToggleTheme,
 }: {
+  active: string;
   onCreate: (type: string) => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
@@ -118,10 +119,7 @@ export function Header({
 
   return (
     <header className="topbar">
-      <label className="search">
-        <MagnifyingGlass size={17} />
-        <input aria-label="Search bookings" placeholder="Search customer or booking..." />
-      </label>
+      <div className="workspace-location"><span>Workspace</span><CaretDown size={11} className="breadcrumb-separator" /><strong>{active}</strong></div>
       <div className="top-actions">
         <button
           className="icon-button"
@@ -136,15 +134,9 @@ export function Header({
         <button className="connection-icon" aria-label="Connection status: online" title="Online">
           <CloudCheck size={19} weight="duotone" />
         </button>
-        <button className="icon-button" aria-label="Notifications">
-          <Bell size={18} />
-        </button>
-        <button className="filter-button">
-          <SlidersHorizontal size={16} /> Filters
-        </button>
-        <div className="create-menu-wrap">
+        <div className="create-menu-wrap" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setCreateOpen(false); }} onKeyDown={event => { if (event.key === "Escape") setCreateOpen(false); }}>
           <button className="primary-button" aria-expanded={createOpen} onClick={() => setCreateOpen((value) => !value)}>
-            <Plus size={17} weight="bold" /> New booking <CaretDown size={12} />
+            <Plus size={17} weight="bold" /> Create <CaretDown size={12} />
           </button>
           {createOpen && (
             <div className="create-menu">

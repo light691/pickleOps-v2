@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Funnel, Plus } from "@phosphor-icons/react";
+import { Plus } from "@phosphor-icons/react";
 import { ApiError, OverlapError } from "../api.ts";
 import { assertNever, bookingId, manilaDate, type ManilaDate } from "../../shared/types.ts";
 import type { CalendarBlock, CalendarBlockState } from "../../server/routes/calendarTypes.ts";
 import { fetchCalendar, patchBookingRequest } from "./calendarApi.ts";
 import "./calendar.css";
+import { fetchCourts } from "./settingsApi.ts";
 
 const DAY_START = 480;
 const DAY_END = 1320;
@@ -81,6 +82,8 @@ function courtOptions({ blocks }: { blocks: readonly CalendarBlock[] }): readonl
 export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: string } | null) => void }) {
   const [date, setDate] = useState(manilaToday());
   const [blocks, setBlocks] = useState<readonly CalendarBlock[]>([]);
+  const [venueCourts, setVenueCourts] = useState<readonly CourtOption[]>([]);
+  const [courtFilter, setCourtFilter] = useState("all");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -93,7 +96,8 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
   const load = useCallback(async ({ day }: { day: string }): Promise<void> => {
     try {
       const dayValue: ManilaDate = manilaDate(day);
-      const calendar = await fetchCalendar({ date: dayValue });
+      const [calendar, configuredCourts] = await Promise.all([fetchCalendar({ date: dayValue }), fetchCourts()]);
+      setVenueCourts(configuredCourts.map(court => ({ id: court.id, name: court.name })));
       setBlocks(calendar.blocks);
       setError(null);
       setSelectedId(null);
@@ -113,7 +117,8 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
     void load({ day: date });
   }, [date, load]);
 
-  const courts = courtOptions({ blocks });
+  const allCourts = venueCourts.length > 0 ? venueCourts : courtOptions({ blocks });
+  const courts = allCourts.filter(court => courtFilter === "all" || String(court.id) === courtFilter);
   const hours: number[] = [];
   for (let hour = DAY_START / 60; hour < DAY_END / 60; hour += 1) hours.push(hour);
   const selected = blocks.find((block) => block.kind === "booking" && (block.bookingId as string) === selectedId) ?? null;
@@ -201,17 +206,18 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
         </button>
         <span>{date}</span>
         <input aria-label="Calendar date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        <button>
-          <Funnel size={15} /> All courts
-        </button>
+        <select aria-label="Filter calendar by court" value={courtFilter} onChange={event => setCourtFilter(event.target.value)}>
+          <option value="all">All courts · {allCourts.length}</option>
+          {allCourts.map(court => <option key={court.id} value={court.id}>{court.name}</option>)}
+        </select>
       </div>
       {error !== null && (
         <p className="clash-banner" role="alert">
           {error}
         </p>
       )}
-      <div className="schedule">
-        <div className="schedule-head">
+      <div className="schedule" role="region" aria-label="Court schedule" tabIndex={0}>
+        <div className="schedule-head" style={{ gridTemplateColumns: `80px repeat(${courts.length}, 1fr)` }}>
           <span></span>
           {courts.map((court) => (
             <strong key={court.name}>{court.name}</strong>
@@ -224,11 +230,12 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
             </div>
           ))}
           {hours.flatMap((hour) =>
-            courts.map((court) => (
+            courts.map((court, courtIndex) => (
               <button
                 key={`${hour}-${court.name}`}
                 aria-label={`Create booking on ${court.name} at ${hourLabel({ hour })}`}
                 className="schedule-cell"
+                style={{ gridColumn: courtIndex + 2, gridRow: hour - DAY_START / 60 + 1 }}
                 onClick={() => onNewBooking({ court: court.name })}
               ></button>
             )),
@@ -236,13 +243,16 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
           {blocks.map((block) => {
             const courtIndex = courts.findIndex((court) => court.name === block.court);
             if (courtIndex < 0) return null;
-            const row = Math.max(0, Math.floor(((block.startMinute as number) - DAY_START) / 60));
-            const span = Math.max(1, Math.round(block.durationMinutes / 60));
+            const start = Math.max(DAY_START, block.startMinute as number);
+            const end = Math.min(DAY_END, (block.startMinute as number) + block.durationMinutes);
+            if (end <= start) return null;
+            const row = Math.floor((start - DAY_START) / 60);
+            const offset = (start - DAY_START) % 60;
             return (
               <button
                 key={block.kind === "booking" ? (block.bookingId as string) : `session-${block.sessionId as number}`}
-                className={`booking-block ${block.state}${selectedId === (block.bookingId as string) ? " selected" : ""}`}
-                style={{ gridColumn: courtIndex + 2, gridRow: `${row + 1} / span ${span}` }}
+                className={`booking-block ${block.state}${block.kind === "booking" && selectedId === block.bookingId ? " selected" : ""}`}
+                style={{ gridColumn: courtIndex + 2, gridRow: row + 1, alignSelf: "start", marginTop: offset / 60 * 62 + 4, height: (end - start) / 60 * 62 - 8 }}
                 onClick={() => openBlock({ block })}
                 aria-label={`${block.customer} on ${block.court} at ${formatBlockRange({ block })}`}
                 title={block.kind === "openplay" ? "Open Play session, managed under Open Play" : undefined}
@@ -255,6 +265,9 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
             );
           })}
         </div>
+      </div>
+      <div className="calendar-legend" aria-label="Booking states">
+        <span><i style={{background:'#aba5ef'}} />Confirmed</span><span><i style={{background:'#8dd6b2'}} />In play</span><span><i style={{background:'#d4b96f'}} />Held</span><span><i style={{background:'#e59ac3'}} />Open Play</span>
       </div>
       {selected !== null && (
         <aside className="calendar-detail" aria-label="Selected booking">
@@ -286,7 +299,7 @@ export function CalendarView({ onNewBooking }: { onNewBooking: (slot: { court: s
             <label>
               Court
               <select value={editCourt} onChange={(event) => setEditCourt(event.target.value)}>
-                {courts.map((court) => (
+                {allCourts.map((court) => (
                   <option key={court.name} value={court.name}>
                     {court.name}
                   </option>

@@ -101,6 +101,7 @@ function parseStatus({ value }: { value: unknown }): CourtStatus {
     value === "Arriving soon" ||
     value === "In play" ||
     value === "Open play soon" ||
+    value === "Open play" ||
     value === "Overtime"
   ) {
     return value;

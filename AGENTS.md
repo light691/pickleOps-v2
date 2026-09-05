@@ -29,3 +29,6 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Domain rules live only in `server/domain/venue.js`. The client never computes prices or statuses.
 - Multi-tenant from day one. Organizations own venues and every row is venue-scoped.
 - The full contract is `docs/architecture.md`. Build against it.
+
+- Today court cards should use minimal neutral surfaces with explicit status dots and labels; keep court identity, customer, and essential timing visible. Reveal secondary details on hover and keyboard focus, with a tap-accessible info control.
+- Keep operational panels compact and independently scrollable when lists are long. Avoid repeating per-player payment status; keep roster/session and payment actions visible while their records scroll.

@@ -124,7 +124,7 @@ export function ReportsView() {
               <small>{formatPesoShort({ centavos: report.outstandingCentavos })} still pending</small>
             </article>
           </div>
-          <div className="report-grid">
+          <div className="report-grid" role="region" aria-label="Detailed reports" tabIndex={0}>
             <article className="report-card utilization-card">
               <div className="report-card-head">
                 <div>

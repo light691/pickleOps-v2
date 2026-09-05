@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DotsThree, Funnel, Plus, UserPlus } from "@phosphor-icons/react";
+import { DotsThree, Plus, UserPlus } from "@phosphor-icons/react";
 import { openPlayStatusKind } from "../../server/routes/openplayTypes.ts";
 import type {
   AttendanceMark,
@@ -18,6 +18,10 @@ import "./openplay.css";
 
 function StatusPill({ children, kind = "" }: { children: string; kind?: string }) {
   return <span className={`pill ${kind}`}>{children}</span>;
+}
+
+function isUpcoming(session: OpenPlaySession): boolean {
+  return new Date(`${session.date}T00:00:00+08:00`).getTime() + session.endMinute * 60000 > Date.now();
 }
 
 function formatClock({ minute }: { minute: number }): string {
@@ -52,13 +56,6 @@ function initials({ name }: { name: string }): string {
     .toUpperCase();
 }
 
-function rosterSubline({ registration }: { registration: OpenPlayRegistration }): string {
-  const payment = registration.paid ? "Paid" : "Payment due";
-  if (registration.attendance === "present") return `${payment} · Present`;
-  if (registration.attendance === "absent") return `${payment} · Absent`;
-  return payment;
-}
-
 function RosterRow({
   registration,
   accent,
@@ -78,35 +75,12 @@ function RosterRow({
         <span className={`avatar ${accent}`}>{initials({ name: registration.playerName })}</span>
         <p>
           <strong>{registration.playerName}</strong>
-          <small>{rosterSubline({ registration })}</small>
         </p>
-        <StatusPill kind={registration.paid ? "mint" : "gold"}>{registration.paid ? "Paid" : "Due"}</StatusPill>
+        {registration.paid ? <StatusPill kind="mint">Paid</StatusPill> : <button className="roster-payment" type="button" disabled={disabled} aria-label={`Mark ${registration.playerName} paid`} onClick={() => onPaid(registration)}>Mark paid</button>}
       </div>
-      <div className="roster-row-actions">
-        {!registration.paid && (
-          <button type="button" disabled={disabled} onClick={() => onPaid(registration)}>
-            Mark paid
-          </button>
-        )}
-        <button
-          type="button"
-          disabled={disabled}
-          aria-pressed={registration.attendance === "present"}
-          className={registration.attendance === "present" ? "active" : undefined}
-          onClick={() => onAttendance(registration, "present")}
-        >
-          Present
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          aria-pressed={registration.attendance === "absent"}
-          className={registration.attendance === "absent" ? "active" : undefined}
-          onClick={() => onAttendance(registration, "absent")}
-        >
-          Absent
-        </button>
-      </div>
+      <select className="roster-attendance" aria-label={`Attendance for ${registration.playerName}`} value={registration.attendance ?? ""} disabled={disabled} onChange={event => { if (event.target.value === "present" || event.target.value === "absent") onAttendance(registration, event.target.value); }}>
+        <option value="" disabled>Not marked</option><option value="present">Present</option><option value="absent">Absent</option>
+      </select>
     </div>
   );
 }
@@ -125,11 +99,12 @@ export function OpenPlayView({
   const [error, setError] = useState<string | null>(null);
   const [walkInName, setWalkInName] = useState("");
   const [acting, setActing] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState("Upcoming");
 
   async function loadSessions({ keepSelection }: { keepSelection: boolean }): Promise<readonly OpenPlaySession[]> {
-    const listed = await listOpenPlaySessions({});
+    const listed = (await listOpenPlaySessions({})).sort((a,b) => Number(isUpcoming(b)) - Number(isUpcoming(a)) || a.date.localeCompare(b.date) || a.startMinute - b.startMinute);
     setSessions(listed);
-    const first = listed[0];
+    const first = listed.find(session => sessionFilter === "All" || isUpcoming(session) === (sessionFilter === "Upcoming"));
     if (!keepSelection || selectedId === null || !listed.some((session) => (session.id as number) === selectedId)) {
       setSelectedId(first === undefined ? null : (first.id as number));
     }
@@ -144,7 +119,8 @@ export function OpenPlayView({
     try {
       setError(null);
       const listed = await loadSessions({ keepSelection: true });
-      const target = id ?? selectedId ?? (listed[0] === undefined ? null : (listed[0].id as number));
+      const first = listed.find(session => sessionFilter === "All" || isUpcoming(session) === (sessionFilter === "Upcoming"));
+      const target = id ?? selectedId ?? (first?.id ?? null);
       if (target !== null) await loadDetail({ id: target });
       else setDetail(null);
       setLoaded(true);
@@ -160,16 +136,19 @@ export function OpenPlayView({
 
   useEffect(() => {
     if (selectedId === null) return;
-    void loadDetail({ id: selectedId }).catch((loadError: unknown) => {
-      setError(loadError instanceof Error ? loadError.message : "Could not load the roster.");
+    let cancelled = false;
+    void getOpenPlayDetail({ id: selectedId }).then(result => { if (!cancelled) setDetail(result); }).catch((loadError: unknown) => {
+      if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Could not load the roster.");
     });
+    return () => { cancelled = true; };
   }, [selectedId]);
 
-  const selected = sessions.find((session) => (session.id as number) === selectedId) ?? null;
+  const visibleSessions = sessions.filter(session => sessionFilter === "All" || isUpcoming(session) === (sessionFilter === "Upcoming"));
+  const selected = visibleSessions.find((session) => (session.id as number) === selectedId) ?? null;
   const registered = detail?.session.rosterCount ?? 0;
   const waitlisted = detail?.waitlist.length ?? 0;
-  const totalRegistered = sessions.reduce((sum, session) => sum + session.rosterCount, 0);
-  const totalWaitlisted = sessions.reduce((sum, session) => sum + session.waitlistCount, 0);
+  const totalRegistered = visibleSessions.reduce((sum, session) => sum + session.rosterCount, 0);
+  const totalWaitlisted = visibleSessions.reduce((sum, session) => sum + session.waitlistCount, 0);
   const dueCount = (detail?.roster.filter((registration) => !registration.paid).length ?? 0) +
     (detail?.waitlist.filter((registration) => !registration.paid).length ?? 0);
 
@@ -249,8 +228,8 @@ export function OpenPlayView({
       )}
       <div className="openplay-summary">
         <div>
-          <span>Upcoming sessions</span>
-          <strong>{sessions.length}</strong>
+          <span>{sessionFilter} sessions</span>
+          <strong>{visibleSessions.length}</strong>
         </div>
         <div>
           <span>Registered players</span>
@@ -261,25 +240,31 @@ export function OpenPlayView({
           <strong>{totalWaitlisted}</strong>
         </div>
         <div>
-          <span>Payments due</span>
+          <span>Unpaid · selected session</span>
           <strong>{dueCount}</strong>
         </div>
       </div>
       <div className="openplay-layout">
         <div className="session-list">
           <div className="list-heading">
-            <h2>Upcoming sessions</h2>
-            <button>
-              <Funnel size={15} /> All sessions
-            </button>
+            <h2>Sessions</h2>
+            <div className="session-tabs" aria-label="Session period">
+              {["Upcoming", "Past", "All"].map(filter => <button key={filter} className={sessionFilter === filter ? "active" : ""} aria-pressed={sessionFilter === filter} onClick={() => {
+                setSessionFilter(filter);
+                const nextId = sessions.find(session => filter === "All" || isUpcoming(session) === (filter === "Upcoming"))?.id ?? null;
+                if (nextId !== selectedId) setDetail(null);
+                setSelectedId(nextId);
+              }}>{filter}</button>)}
+            </div>
           </div>
+          <div className="session-scroll" role="region" aria-label="Sessions" tabIndex={0}>
           {!loaded && <p className="openplay-empty">Loading sessions…</p>}
-          {loaded && sessions.length === 0 && <p className="openplay-empty">No open play sessions yet.</p>}
-          {sessions.map((session) => (
+          {loaded && visibleSessions.length === 0 && <p className="openplay-empty">No {sessionFilter === "All" ? "" : sessionFilter.toLowerCase()} sessions to show.</p>}
+          {visibleSessions.map((session) => (
             <button
               key={session.id as number}
               className={selectedId === (session.id as number) ? "session-row selected" : "session-row"}
-              onClick={() => setSelectedId(session.id as number)}
+              onClick={() => { if (selectedId !== session.id) { setDetail(null); setSelectedId(session.id as number); } }}
             >
               <div className="session-date">
                 <strong>{formatDateLabel({ date: session.date as string })}</strong>
@@ -307,6 +292,7 @@ export function OpenPlayView({
               </div>
             </button>
           ))}
+          </div>
         </div>
         <aside className="roster-panel">
           {selected === null || detail === null ? (
@@ -323,7 +309,7 @@ export function OpenPlayView({
                     {formatClock({ minute: selected.endMinute as number })}
                   </p>
                 </div>
-                <button className="icon-button" aria-label="More session options">
+                <button className="icon-button" aria-label="Edit session" onClick={() => onManageSession(selected)}>
                   <DotsThree size={20} />
                 </button>
               </div>
@@ -334,15 +320,15 @@ export function OpenPlayView({
                     {registered} / {selected.capacity}
                   </strong>
                 </div>
-                <progress value={registered} max={selected.capacity}></progress>
                 <small>
                   {Math.max(selected.capacity - registered, 0)} spots available ·{" "}
                   {detail.roster.filter((registration) => registration.paid).length} paid
                 </small>
               </div>
+              <div className="roster-scroll" role="region" aria-label="Players and waitlist" tabIndex={0} key={selected.id}>
               <div className="roster-title">
-                <h3>Player list</h3>
-                <span>{registered} players</span>
+                <h3>Players</h3>
+                <span>Payment · Attendance</span>
               </div>
               <div className="roster-list">
                 {detail.roster.map((registration, index) => (
@@ -371,17 +357,18 @@ export function OpenPlayView({
                         <span className="avatar">{registration.waitlistPosition ?? "–"}</span>
                         <p>
                           <strong>{registration.playerName}</strong>
-                          <small>Position {registration.waitlistPosition ?? "–"}</small>
                         </p>
                         <StatusPill kind="gold">Waiting</StatusPill>
                       </div>
                     ))}
                   </div>
-                  <button className="primary-button full-button" disabled={acting} onClick={() => void promoteNext()}>
+                  <button className="primary-button full-button" disabled={acting || registered >= selected.capacity} title={registered >= selected.capacity ? "A roster spot must open before promoting a player" : undefined} onClick={() => void promoteNext()}>
                     Promote next player
                   </button>
                 </>
               )}
+              </div>
+              <div className="roster-footer">
               <form className="walkin-form" onSubmit={(event) => void addWalkIn({ event })}>
                 <input
                   aria-label="Walk-in player name"
@@ -390,12 +377,13 @@ export function OpenPlayView({
                   onChange={(event) => setWalkInName(event.target.value)}
                 />
                 <button className="secondary-button full-button" type="submit" disabled={acting || walkInName.trim().length === 0}>
-                  <UserPlus size={16} /> Add walk-in player
+                  <UserPlus size={16} /> {registered >= selected.capacity ? "Join waitlist" : "Add player"}
                 </button>
               </form>
               <button className="primary-button full-button" onClick={() => onManageSession(selected)}>
                 Manage session
               </button>
+              </div>
             </>
           )}
         </aside>

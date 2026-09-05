@@ -427,16 +427,19 @@ export function deriveCourtStatus({
   nextBooking,
   nowMinute,
   openPlaySoon,
+  openPlayActive = false,
 }: {
   openSession: { scheduledEndMinute: MinutesFromMidnight } | null;
   nextBooking: { startMinute: MinutesFromMidnight } | null;
   nowMinute: MinutesFromMidnight;
   openPlaySoon: boolean;
+  openPlayActive?: boolean;
 }): CourtStatus {
   if (openSession !== null) {
     if ((nowMinute as number) > (openSession.scheduledEndMinute as number)) return "Overtime";
     return "In play";
   }
+  if (openPlayActive) return "Open play";
   if (openPlaySoon) return "Open play soon";
   if (nextBooking !== null && (nextBooking.startMinute as number) - (nowMinute as number) <= 30) return "Arriving soon";
   return "Available";
@@ -449,6 +452,7 @@ interface TodayCourtInput {
   readonly nowMinute: MinutesFromMidnight;
   readonly closeMinute: MinutesFromMidnight;
   readonly openPlaySoon: boolean;
+  readonly openPlay?: { name: string; start: number; end: number } | undefined;
 }
 
 function buildCourtCard(input: TodayCourtInput): TodayCourtCard {
@@ -457,6 +461,7 @@ function buildCourtCard(input: TodayCourtInput): TodayCourtCard {
     nextBooking: input.upcoming[0] ?? null,
     nowMinute: input.nowMinute,
     openPlaySoon: input.openPlaySoon && input.openSession === null,
+    openPlayActive: input.openPlay !== undefined && input.openPlay.start <= input.nowMinute,
   });
   const presentation = statusPresentation({ status });
   const base = {
@@ -511,14 +516,15 @@ function buildCourtCard(input: TodayCourtInput): TodayCourtCard {
         next: `${paymentShortLabel({ status: nextBooking.paymentStatus })} · ${nextBooking.source}`,
       };
     }
+    case "Open play":
     case "Open play soon": {
-      const nextBooking = input.upcoming[0];
+      const session = input.openPlay;
       return {
         ...base,
         headline: null,
-        customer: nextBooking?.customerName ?? "Open Play",
-        meta: nextBooking
-          ? `${formatRange({ start: nextBooking.startMinute, end: minuteOfDay(bookingEndMinute({ start: nextBooking.startMinute, durationMinutes: nextBooking.durationMinutes })) })} · Shared session`
+        customer: session?.name ?? "Open Play",
+        meta: session
+          ? `${formatRange({ start: minuteOfDay(session.start), end: minuteOfDay(session.end) })} · Shared session`
           : "Shared session today",
         next: "Check the Open Play section",
       };
@@ -527,7 +533,7 @@ function buildCourtCard(input: TodayCourtInput): TodayCourtCard {
       const nextBooking = input.upcoming[0];
       return {
         ...base,
-        headline: `Open until ${formatClock({ minute: nextBooking?.startMinute ?? input.closeMinute })}`,
+        headline: `Open until ${formatClock({ minute: minuteOfDay(Math.min(nextBooking?.startMinute ?? input.closeMinute, input.openPlay?.start ?? input.closeMinute)) })}`,
         customer: null,
         meta: `${formatRate({ value: input.court.hourlyRate })} / hour`,
         next:
@@ -572,9 +578,15 @@ export function getToday({
   }
 
   const courts = courtRows.map((row) => parseCourtRow(row));
+  const openPlay = db.prepare("SELECT name, start_minute, end_minute, court_ids FROM openplay_sessions WHERE venue_id = ? AND date = ? AND end_minute > ? ORDER BY start_minute")
+    .all(venueId, date, nowMinute).map(row => ({
+      name: String(row.name), start: Number(row.start_minute), end: Number(row.end_minute),
+      courtIds: JSON.parse(String(row.court_ids)) as number[],
+    }));
   const cards: TodayCourtCard[] = courts.map((court) => {
+    const sharedSession = openPlay.find(session => session.courtIds.includes(court.id));
     const upcoming = bookings
-      .filter((booking) => booking.courtId === court.id && bookingEndMinute({ start: booking.startMinute, durationMinutes: booking.durationMinutes }) > (nowMinute as number))
+      .filter((booking) => booking.courtId === court.id && booking.status !== "In play" && bookingEndMinute({ start: booking.startMinute, durationMinutes: booking.durationMinutes }) > (nowMinute as number))
       .sort((a, b) => (a.startMinute as number) - (b.startMinute as number));
     return buildCourtCard({
       court,
@@ -582,7 +594,8 @@ export function getToday({
       upcoming,
       nowMinute,
       closeMinute: settings.closeMinute,
-      openPlaySoon: false,
+      openPlaySoon: sharedSession !== undefined && sharedSession.start - nowMinute <= 30,
+      openPlay: sharedSession,
     });
   });
   return { date, courts: cards };

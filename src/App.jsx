@@ -111,6 +111,10 @@ export function App() {
       setActive('Payments');
       return;
     }
+    if (item.status && item.status !== 'Available') {
+      setActive('Calendar');
+      return;
+    }
     openBooking(item);
   };
 
@@ -160,8 +164,8 @@ export function App() {
     <div className="app-shell">
       <SideNav active={active} setActive={setActive} staff={session.staff} onLogout={handleLogout} />
       <main className="workspace">
-        <Header onCreate={handleCreate} theme={theme} onToggleTheme={handleToggleTheme} />
-        <div className="content">{content}</div>
+        <Header active={active} onCreate={handleCreate} theme={theme} onToggleTheme={handleToggleTheme} />
+        <div className="content" role="region" aria-label={`${active} workspace`} tabIndex={0}>{content}</div>
       </main>
       <BookingDrawer
         key={drawerOpen ? selectedCourt?.court || 'new' : 'closed'}
