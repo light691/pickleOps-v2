@@ -32,3 +32,10 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - Today court cards should use minimal neutral surfaces with explicit status dots and labels; keep court identity, customer, and essential timing visible. Reveal secondary details on hover and keyboard focus, with a tap-accessible info control.
 - Keep operational panels compact and independently scrollable when lists are long. Avoid repeating per-player payment status; keep roster/session and payment actions visible while their records scroll.
+
+## Today UI decisions (September 2026)
+
+- Today is an operations surface: keep the existing charcoal FlowDesk language and shell, with one neutral card per court and no analytics or utilization metrics.
+- Use one count-bearing status filter toolbar for All courts, Available, In play, Arriving soon, Open Play, and Overtime. Counts remain visible even when a state is zero, and the All courts count is the venue total.
+- Court cards keep server-derived status, dot, court identity, customer, and essential timing visible. Keep secondary session detail progressively disclosed on hover, keyboard focus, or the info control. Card actions use clear text labels and preserve existing booking, Calendar, and Open Play handlers.
+- Keep the Needs attention and Open Play panels compact and independently scrollable when populated. Open Play rows show the session name, time, registrations/capacity, waitlist, and a clear Manage action.
