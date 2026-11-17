@@ -2,6 +2,22 @@
 
 Operations dashboard for a Philippine pickleball venue. Front-desk staff run the day from one screen: court bookings, walk-ins, shared Open Play sessions, payment verification and reports.
 
+The staff-facing UI is branded **RallyPoint**.
+
+![Today view: one status card per court, with live session state and quick actions](docs/screenshots/today.png)
+
+## Screenshots
+
+All screens below are from the running app with seeded demo data (names are fictional).
+
+| Open Play | Reports |
+|---|---|
+| ![Open Play: session list, capacity, waitlist and per-player payment and attendance](docs/screenshots/openplay.png) | ![Reports: utilization, booked vs played time, revenue, booking outcomes and payment mix](docs/screenshots/reports.png) |
+
+| New booking drawer |
+|---|
+| ![Reserve a court drawer with source, customer, date, time, duration, court and fee summary](docs/screenshots/booking-drawer.png) |
+
 ## Features
 
 - **Today:** one status card per court, with live session state and quick actions
